@@ -7,9 +7,13 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspaces --if-present",
+    "dev": "npx concurrently \"npm run dev -w @fleetpilot/web\" \"npm run dev -w @fleetpilot/api\"",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "db:migrate": "dotenv -e .env -- npm run migrate -w @fleetpilot/api"
+  },
+  "devDependencies": {
+    "dotenv-cli": "^11.0.0"
   }
 }

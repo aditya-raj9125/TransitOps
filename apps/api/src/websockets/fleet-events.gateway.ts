@@ -53,7 +53,7 @@ export class FleetEventGateway
         `Client connected: ${client.id} (User: ${payload.sub}, Role: ${payload.role})`,
       );
     } catch (error) {
-      console.log(`Connection failed: ${error.message}`);
+      console.log(`Connection failed: ${(error as Error).message}`);
       client.disconnect();
     }
   }
