@@ -2,6 +2,10 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { GlobalLayout } from './components/layout/GlobalLayout';
 import { Dashboard } from './pages/Dashboard/Dashboard';
+import { Trips } from './pages/Trips/Trips';
+import { Vehicles } from './pages/Vehicles/Vehicles';
+import { Drivers } from './pages/Drivers/Drivers';
+import { FuelExpenses, Maintenance } from './pages/Placeholders';
 import { useAuthStore } from './store/authStore';
 
 const Login = () => {
@@ -46,6 +50,11 @@ function App() {
         <Route element={<GlobalLayout />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/trips" element={<Trips />} />
+          <Route path="/vehicles" element={<Vehicles />} />
+          <Route path="/drivers" element={<Drivers />} />
+          <Route path="/fuel" element={<FuelExpenses />} />
+          <Route path="/maintenance" element={<Maintenance />} />
           {/* Placeholders for other routes */}
           <Route path="*" element={<div className="p-8 text-center text-muted-foreground">Module coming soon</div>} />
         </Route>
