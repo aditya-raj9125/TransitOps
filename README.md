@@ -1,155 +1,162 @@
-# FleetPilot — Smart Transport Operations Platform
+# FleetPilot
 
 > **Command your fleet. Trust your data.**
 
-A production-grade, full-stack fleet operations platform built on **PostgreSQL + NestJS + React**. Digitizes vehicle management, driver dispatch, maintenance tracking, fuel & expense logging, and real-time operational analytics — all enforced through a strict RBAC layer and business-rule validation pipeline.
+FleetPilot is a modern, production-grade fleet operations platform. It digitizes vehicle management, driver dispatch, maintenance tracking, fuel and expense logging, and real-time operational analytics — all enforced through a strict role-based access control (RBAC) layer and business-rule validation pipeline.
 
----
+## 🏗️ System Architecture
 
-## Architecture
+FleetPilot is designed as a modular Monorepo (powered by npm workspaces), running entirely in a local Node.js environment.
 
+```mermaid
+flowchart TD
+    subgraph Frontend ["React SPA (apps/web)"]
+        UI[React 18 + Vite]
+        State[Zustand Store]
+        Query[React Query]
+        UI --> State
+        UI --> Query
+    end
+
+    subgraph Backend ["NestJS API (apps/api)"]
+        Gateway[API Gateway / Controllers]
+        Services[Business Logic Services]
+        Auth[JWT + RBAC Guards]
+        Prisma[Prisma ORM]
+        
+        Gateway --> Auth
+        Auth --> Services
+        Services --> Prisma
+    end
+
+    subgraph Database ["PostgreSQL"]
+        DB[(Relational DB)]
+    end
+
+    Client([Web Browser]) -->|HTTP / REST| Frontend
+    Frontend -->|API Requests| Gateway
+    Prisma -->|TCP / SQL| DB
 ```
-TransitOps/
-├── backend/          # NestJS + TypeScript + Prisma ORM
-├── frontend/         # React 18 + TypeScript + Vite + TailwindCSS
-├── docker-compose.yml
-├── .env.example
-└── README.md
+
+### Tech Stack
+
+- **Frontend:** React 18, TypeScript, Vite, TailwindCSS, Zustand, React Query, React Hook Form, Zod, Recharts, FullCalendar
+- **Backend:** NestJS, TypeScript, Prisma ORM
+- **Database:** PostgreSQL 15
+- **Authentication:** JWT (access + refresh token rotation), Argon2 password hashing, httpOnly cookies
+- **Real-Time Updates:** Socket.io + PostgreSQL LISTEN/NOTIFY mechanism
+
+## 🗄️ Database Schema
+
+The database relies on `Organization` as the root tenant for multi-tenancy (or logical isolation).
+
+```mermaid
+erDiagram
+    ORGANIZATION ||--o{ USER : has
+    ORGANIZATION ||--o{ VEHICLE : has
+    ORGANIZATION ||--o{ DRIVER : has
+    ORGANIZATION ||--o{ TRIP : has
+    
+    USER ||--o{ AUDIT_LOG : generates
+    
+    VEHICLE ||--o{ TRIP : assigned_to
+    VEHICLE ||--o{ MAINTENANCE_LOG : undergoes
+    VEHICLE ||--o{ FUEL_LOG : consumes
+    
+    DRIVER ||--o{ TRIP : drives
+    DRIVER ||--o{ DOCUMENT : has
+    
+    TRIP ||--o{ EXPENSE : incurs
+    TRIP ||--o{ FUEL_LOG : associated_with
+
+    ORGANIZATION {
+        string id PK
+        string name
+        string timezone
+    }
+    USER {
+        string id PK
+        string email
+        string role
+        boolean isActive
+    }
+    VEHICLE {
+        string id PK
+        string registrationNumber
+        string type
+        string status
+    }
+    DRIVER {
+        string id PK
+        string fullName
+        string licenseNumber
+        string status
+    }
+    TRIP {
+        string id PK
+        string tripCode
+        string status
+        datetime scheduledStart
+    }
 ```
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, TypeScript, Vite, TailwindCSS, TanStack Query, Zustand, Recharts, FullCalendar |
-| Backend | NestJS, TypeScript, Prisma ORM |
-| Database | PostgreSQL 15 |
-| Auth | JWT (access + refresh rotation), Argon2 hashing, httpOnly cookies |
-| Real-time | Socket.io + PostgreSQL LISTEN/NOTIFY |
-| Jobs | node-cron (expiry sweeps) |
-| Export | csv-writer, Puppeteer (PDF) |
-| Containers | Docker + docker-compose |
+## 🚀 Quick Start (Local Development)
 
----
+The project runs locally using native Node.js environments. **Docker is not required or supported.**
 
-## Quick Start (Local Development)
+### 1. Prerequisites
+- Node.js (v20+)
+- PostgreSQL (running locally on port 5432)
 
-### Prerequisites
-- Node.js ≥ 18
-- PostgreSQL 15 (or use Docker)
-- Docker + docker-compose (optional, for containerized run)
-
-### Option A — Docker (recommended, zero manual DB setup)
-
+### 2. Environment Setup
+Rename the provided `.env.example` file to `.env` in the **root directory**.
 ```bash
-cp .env.example .env          # Edit DB credentials if needed
-docker-compose up --build     # Starts postgres + backend + frontend
+cp .env.example .env
 ```
+Ensure your `DATABASE_URL` in the `.env` points to your active local PostgreSQL instance. Both the frontend and backend automatically load variables from this central file.
 
-The seed script runs automatically on first start. Open http://localhost:5173
-
-### Option B — Manual
-
+### 3. Install Dependencies
+Install packages across all workspaces from the root directory:
 ```bash
-# 1. Clone and install dependencies
-git clone https://github.com/aditya-raj9125/TransitOps.git
-cd TransitOps
-
-# 2. Backend setup
-cd backend
-cp ../.env.example .env
 npm install
-npm run db:migrate     # Run Prisma migrations
-npm run db:seed        # Seed demo data
-npm run start:dev      # Starts on http://localhost:3001
-
-# 3. Frontend setup (new terminal)
-cd ../frontend
-npm install
-npm run dev            # Starts on http://localhost:5173
 ```
 
----
-
-## Environment Variables
-
-See [`.env.example`](./.env.example) for all required variables.
-
-Key variables:
-
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/fleetpilot` |
-| `JWT_SECRET` | Access token signing secret | *(required)* |
-| `JWT_REFRESH_SECRET` | Refresh token signing secret | *(required)* |
-| `PORT` | Backend port | `3001` |
-| `FRONTEND_URL` | CORS origin | `http://localhost:5173` |
-
----
-
-## Database Migrations
-
+### 4. Database Migration
+Apply the database schema and generate the Prisma client:
 ```bash
-cd backend
-npm run db:migrate      # Apply all pending migrations
-npm run db:migrate:dev  # Create a new migration (dev only)
-npm run db:seed         # Seed realistic demo data
-npm run db:reset        # Reset DB + re-seed (destructive!)
+cd apps/api
+npx prisma migrate dev
+cd ../..
 ```
 
----
-
-## Demo Credentials (after seeding)
-
-| Role | Email | Password |
-|---|---|---|
-| Admin | admin@fleetpilot.dev | FleetPilot@2026 |
-| Fleet Manager | fleet@fleetpilot.dev | FleetPilot@2026 |
-| Dispatcher | dispatch@fleetpilot.dev | FleetPilot@2026 |
-| Safety Officer | safety@fleetpilot.dev | FleetPilot@2026 |
-| Financial Analyst | finance@fleetpilot.dev | FleetPilot@2026 |
-
----
-
-## API Reference
-
-Base URL: `http://localhost:3001/api/v1`
-
-All responses follow the envelope:
-```json
-{ "data": {}, "meta": {}, "error": null }
+### 5. Start the Application
+Run both the frontend (Vite) and backend (NestJS) concurrently:
+```bash
+npm run dev
 ```
 
-Key endpoints:
-- `POST /auth/login` — authenticate, returns access token + sets refresh cookie
-- `GET /vehicles?page=1&pageSize=20&q=searchTerm&status=Available`
-- `POST /trips/:id/dispatch` — dispatch a trip (runs full validation pipeline)
-- `GET /reports/analytics?from=2026-01-01&to=2026-07-01&region=north`
+The Web UI will be available at `http://localhost:5173`.
+The API will be available at `http://localhost:3000/api/v1`.
 
-Full API docs available at `http://localhost:3001/api/docs` (Swagger) after starting the backend.
+## 📚 API Documentation
 
----
+When the backend server is running in development mode, the interactive Swagger API documentation is available at:
+`http://localhost:3000/api/docs`
 
-## RBAC Roles
+## 🔒 Demo Credentials
 
-| Role | Key Capabilities |
-|---|---|
-| **Admin** | Full access, user/role management, audit log |
-| **Fleet Manager** | CRUD vehicles & maintenance, view all reports |
-| **Dispatcher** | Create/dispatch/complete/cancel trips |
-| **Safety Officer** | CRUD drivers, license tracking, suspend drivers |
-| **Financial Analyst** | Read-only fleet data, full fuel/expense/reports access, CSV/PDF export |
+You can test the application using the following seeded admin credentials:
+- **Email:** admin@fleetpilot.dev
+- **Password:** Admin@123
 
----
+## 🛠️ Available Scripts
 
-## Business Rules Enforced
+From the repository root, you can run:
+- `npm run dev`: Starts both frontend and backend development servers.
+- `npm run build`: Compiles both frontend and backend for production.
+- `npm run lint`: Runs ESLint and formatting checks across all workspaces.
+- `npm run test`: Executes unit tests for all applications.
 
-- Cargo weight ≤ vehicle max load capacity (service layer + DB trigger)
-- Vehicle must be `Available` to be dispatched (never `On Trip`, `In Shop`, `Retired`)
-- Driver must be `Available`, license not expired, not `Suspended`
-- No overlapping active trips per vehicle or driver (DB-level partial unique index + advisory lock)
-- All state transitions (dispatch/complete/cancel/maintenance) execute inside a single DB transaction
+## 📄 License
 
----
-
-## License
-
-MIT © FleetPilot
+This project is proprietary software. Unauthorized copying, modification, or distribution is strictly prohibited.
