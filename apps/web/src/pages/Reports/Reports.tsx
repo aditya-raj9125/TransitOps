@@ -10,19 +10,11 @@ import apiClient from '../../api/client';
 
 const COLORS = ['#4F46E5', '#F97316', '#A855F7', '#10B981', '#F59E0B', '#EF4444'];
 
-// Mock data for charts (real analytics would be from a /reports endpoint)
-const utilizationTrend = [
-  {m:'Jan',v:62},{m:'Feb',v:70},{m:'Mar',v:58},{m:'Apr',v:80},{m:'May',v:75},{m:'Jun',v:89},
-];
-const costBreakdown = [
-  {category:'Fuel',amount:45000},{category:'Maintenance',amount:28000},{category:'Tolls',amount:12000},{category:'Permits',amount:8000},{category:'Misc',amount:5000},
-];
-const fuelEfficiency = [
-  {name:'VAN-001',km_per_l:14.2},{name:'TRUCK-04',km_per_l:8.5},{name:'PICKUP-07',km_per_l:11.3},{name:'VAN-003',km_per_l:13.7},{name:'TRUCK-09',km_per_l:7.9},
-];
-const driverSafety = [
-  {score:'90-100',count:3},{score:'80-90',count:5},{score:'70-80',count:4},{score:'60-70',count:2},{score:'<60',count:1},
-];
+// Empty arrays to replace static mock data
+const utilizationTrend: any[] = [];
+const costBreakdown: any[] = [];
+const fuelEfficiency: any[] = [];
+const driverSafety: any[] = [];
 
 const MetricCard = ({ icon: Icon, label, value, sub, color }: any) => (
   <Card>

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { Bell, Search, Settings, User, LogOut, Moon, Sun } from 'lucide-react';
+import { useUiStore } from '../../store/uiStore';
+import { Bell, Search, Settings, User, LogOut, Moon, Sun, Menu } from 'lucide-react';
 
 export const Header = () => {
   const { user, clearAuth } = useAuthStore();
   const navigate = useNavigate();
+  const { sidebarOpen, setSidebarOpen } = useUiStore();
   const [profileOpen, setProfileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
 
@@ -23,8 +25,16 @@ export const Header = () => {
 
   return (
     <header className="sticky top-0 z-40 h-16 flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-4 md:px-6 shrink-0">
-      {/* Left: Global Search */}
-      <div className="flex items-center gap-3 flex-1">
+      {/* Left: Collapse & Global Search */}
+      <div className="flex items-center gap-4 flex-1">
+        <button 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          title="Toggle Sidebar"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
         <div className="hidden md:flex relative max-w-sm w-full items-center">
           <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
           <input

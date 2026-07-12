@@ -19,6 +19,8 @@ import { LoginPage } from './pages/Auth/LoginPage';
 import { ForgotPasswordPage } from './pages/Auth/ForgotPasswordPage';
 import { ResetPasswordPage } from './pages/Auth/ResetPasswordPage';
 import { LandingPage } from './pages/Landing/LandingPage';
+import { NewTripForm } from './pages/Trips/NewTripForm';
+import { OperationsCalendar } from './pages/Calendar/OperationsCalendar';
 import { useAuthStore } from './store/authStore';
 
 // Persist dark mode preference on load
@@ -53,7 +55,7 @@ function App() {
 
           {/* Trips */}
           <Route path="/dispatch" element={<Trips />} />
-          <Route path="/dispatch/new" element={<ComingSoon title="New Trip Form" />} />
+          <Route path="/dispatch/new" element={<NewTripForm />} />
           <Route path="/trips" element={<Navigate to="/dispatch" replace />} />
           <Route path="/trips/:id" element={<TripDetail />} />
 
@@ -66,7 +68,7 @@ function App() {
           <Route path="/drivers/:id" element={<DriverDetail />} />
 
           {/* Operational */}
-          <Route path="/calendar" element={<ComingSoon title="Operations Calendar" />} />
+          <Route path="/calendar" element={<OperationsCalendar />} />
           <Route path="/maintenance" element={<Maintenance />} />
           <Route path="/fuel" element={<FuelExpenses />} />
 

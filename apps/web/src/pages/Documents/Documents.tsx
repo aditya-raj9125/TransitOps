@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Search, Upload, FileText, AlertTriangle, CheckCircle2, X, Grid, List } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import apiClient from '../../api/client';
+import { Loader2 } from 'lucide-react';
 
 const DOC_TYPE_ICON: Record<string, string> = {
   Insurance: '🛡️', RC: '📋', Permit: '📄', License: '🪪', PUC: '🌿', Other: '📁',
@@ -24,6 +26,78 @@ export const Documents = () => {
   const [entityTypeFilter, setEntityTypeFilter] = useState('');
   const [expiryFilter, setExpiryFilter] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Modal & Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [drivers, setDrivers] = useState<any[]>([]);
+  
+  const [formData, setFormData] = useState({
+    entityType: 'Vehicle',
+    entityId: '',
+    docType: 'Insurance',
+    fileUrl: '',
+    expiryDate: '',
+  });
+
+  const fetchOptions = async () => {
+    try {
+      const [vRes, dRes] = await Promise.all([
+        apiClient.get('/vehicles?pageSize=1000').catch(() => ({ data: { data: [] } })),
+        apiClient.get('/drivers?pageSize=1000').catch(() => ({ data: { data: [] } })),
+      ]);
+      const v = vRes.data?.data || [];
+      const d = dRes.data?.data || [];
+      setVehicles(v);
+      setDrivers(d);
+      if (v.length > 0) setFormData(prev => ({ ...prev, entityId: v[0].id }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (isModalOpen && vehicles.length === 0 && drivers.length === 0) fetchOptions();
+  }, [isModalOpen]);
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
+
+  const handleEntityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const type = e.target.value;
+    const items = type === 'Vehicle' ? vehicles : drivers;
+    setFormData({ ...formData, entityType: type, entityId: items.length > 0 ? items[0].id : '' });
+  };
+
+  const handleUploadDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      const payload: any = { ...formData };
+      if (payload.expiryDate) payload.expiryDate = new Date(payload.expiryDate).toISOString();
+      else delete payload.expiryDate;
+
+      await apiClient.post('/documents', payload);
+      setIsModalOpen(false);
+      setFormData({
+        entityType: 'Vehicle',
+        entityId: vehicles.length > 0 ? vehicles[0].id : '',
+        docType: 'Insurance',
+        fileUrl: '',
+        expiryDate: '',
+      });
+      fetchDocs();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to upload document.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchDocs = async () => {
     setLoading(true);
@@ -60,7 +134,7 @@ export const Documents = () => {
           <h1 className="text-2xl font-bold text-foreground">Documents Vault</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Vehicle and driver documents with expiry tracking</p>
         </div>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button onClick={() => setIsModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
           <Upload className="h-4 w-4 mr-2" /> Upload Document
         </Button>
       </div>
@@ -142,6 +216,62 @@ export const Documents = () => {
           })}
         </div>
       )}
+
+      {/* Upload Document Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Upload Document">
+        <form onSubmit={handleUploadDocument} className="space-y-4">
+          {error && <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-medium">{error}</div>}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Related To</label>
+              <select name="entityType" value={formData.entityType} onChange={handleEntityChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="Vehicle">Vehicle</option>
+                <option value="Driver">Driver</option>
+              </select>
+            </div>
+            
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">{formData.entityType}</label>
+              <select required name="entityId" value={formData.entityId} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                {formData.entityType === 'Vehicle' 
+                  ? vehicles.map(v => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)
+                  : drivers.map(d => <option key={d.id} value={d.id}>{d.fullName}</option>)
+                }
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Document Type</label>
+              <select required name="docType" value={formData.docType} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="Insurance">Insurance</option>
+                <option value="RC">RC (Registration)</option>
+                <option value="Permit">Permit</option>
+                <option value="License">License</option>
+                <option value="PUC">PUC (Pollution)</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Expiry Date (Optional)</label>
+              <input type="date" name="expiryDate" value={formData.expiryDate} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+
+            <div className="space-y-1.5 col-span-2">
+              <label className="text-sm font-medium text-foreground">Document URL / File Path</label>
+              <input required type="url" name="fileUrl" value={formData.fileUrl} onChange={handleFormChange} placeholder="e.g. https://storage.com/file.pdf" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+          </div>
+
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-border mt-2">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[100px]">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Upload'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

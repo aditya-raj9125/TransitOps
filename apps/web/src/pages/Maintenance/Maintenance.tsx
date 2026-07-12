@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Plus, Search, X, Filter, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import apiClient from '../../api/client';
+import { Loader2 } from 'lucide-react';
 
 const TYPE_COLORS: Record<string, string> = {
   'Oil Change': 'bg-blue-100 text-blue-700',
@@ -20,6 +22,80 @@ export const Maintenance = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<any>(null);
+
+  // Modal & Form
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [vehicles, setVehicles] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    vehicleId: '',
+    maintenanceType: 'GeneralService',
+    status: 'Open',
+    cost: '',
+    vendorName: '',
+    scheduledDate: '',
+    completedDate: '',
+    description: '',
+  });
+
+  const fetchVehicles = async () => {
+    try {
+      const res = await apiClient.get('/vehicles?pageSize=1000');
+      setVehicles(res.data?.data || []);
+      if (res.data?.data?.length > 0) {
+        setFormData(prev => ({ ...prev, vehicleId: res.data.data[0].id }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (isModalOpen && vehicles.length === 0) {
+      fetchVehicles();
+    }
+  }, [isModalOpen]);
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
+
+  const handleAddMaintenance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      const payload: any = { ...formData };
+      if (payload.cost) payload.cost = parseFloat(payload.cost);
+      else delete payload.cost;
+
+      if (payload.scheduledDate) payload.scheduledDate = new Date(payload.scheduledDate).toISOString();
+      else delete payload.scheduledDate;
+
+      if (payload.completedDate) payload.completedDate = new Date(payload.completedDate).toISOString();
+      else delete payload.completedDate;
+
+      await apiClient.post('/maintenance', payload);
+      setIsModalOpen(false);
+      setFormData({
+        vehicleId: vehicles.length > 0 ? vehicles[0].id : '',
+        maintenanceType: 'GeneralService',
+        status: 'Open',
+        cost: '',
+        vendorName: '',
+        scheduledDate: '',
+        completedDate: '',
+        description: '',
+      });
+      fetchRecords();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to add maintenance record.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchRecords = async () => {
     setLoading(true);
@@ -52,7 +128,7 @@ export const Maintenance = () => {
             {meta && <span className="ml-2 text-xs">({meta.total} records)</span>}
           </p>
         </div>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button onClick={() => setIsModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
           <Plus className="h-4 w-4 mr-2" /> New Maintenance Record
         </Button>
       </div>
@@ -139,6 +215,72 @@ export const Maintenance = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Add Maintenance Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="New Maintenance Record">
+        <form onSubmit={handleAddMaintenance} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-medium">
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5 col-span-2">
+              <label className="text-sm font-medium text-foreground">Vehicle</label>
+              <select required name="vehicleId" value={formData.vehicleId} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="">Select a vehicle...</option>
+                {vehicles.map(v => (
+                  <option key={v.id} value={v.id}>{v.registrationNumber} ({v.nameModel})</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Maintenance Type</label>
+              <select required name="maintenanceType" value={formData.maintenanceType} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="OilChange">Oil Change</option>
+                <option value="Tires">Tires</option>
+                <option value="Brakes">Brakes</option>
+                <option value="GeneralService">General Service</option>
+                <option value="Repair">Repair</option>
+                <option value="Inspection">Inspection</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Status</label>
+              <select required name="status" value={formData.status} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="Open">Open</option>
+                <option value="Closed">Closed</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Cost (₹)</label>
+              <input type="number" min="0" step="0.01" name="cost" value={formData.cost} onChange={handleFormChange} placeholder="e.g. 5000" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Vendor Name</label>
+              <input type="text" name="vendorName" value={formData.vendorName} onChange={handleFormChange} placeholder="e.g. Tata Motors Service" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Scheduled Date</label>
+              <input type="date" name="scheduledDate" value={formData.scheduledDate} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Completed Date</label>
+              <input type="date" name="completedDate" value={formData.completedDate} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <label className="text-sm font-medium text-foreground">Description</label>
+              <textarea name="description" value={formData.description} onChange={handleFormChange} placeholder="Notes about the maintenance..." rows={2} className="w-full px-3 py-2 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary resize-none" />
+            </div>
+          </div>
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-border mt-2">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[100px]">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Record'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

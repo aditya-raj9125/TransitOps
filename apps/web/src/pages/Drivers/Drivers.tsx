@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, User, Phone, AlertTriangle, Star, X, ChevronRight } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
 import apiClient from '../../api/client';
+import { Loader2 } from 'lucide-react';
 
 const STATUS_CLASSES: Record<string, string> = {
   Available: 'text-status-available bg-status-available',
@@ -35,6 +37,44 @@ export const Drivers = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<any>(null);
+
+  // Modal & Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    fullName: '',
+    licenseNumber: '',
+    licenseCategory: 'HMV',
+    licenseExpiryDate: '',
+    contactNumber: '',
+    email: '',
+  });
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
+
+  const handleAddDriver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      const payload = {
+        ...formData,
+        licenseExpiryDate: new Date(formData.licenseExpiryDate).toISOString(),
+      };
+      await apiClient.post('/drivers', payload);
+      setIsModalOpen(false);
+      setFormData({ fullName: '', licenseNumber: '', licenseCategory: 'HMV', licenseExpiryDate: '', contactNumber: '', email: '' });
+      fetchDrivers();
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to add driver. Please check inputs.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const fetchDrivers = async () => {
     setLoading(true);
@@ -85,7 +125,7 @@ export const Drivers = () => {
             {meta && <span className="ml-2 text-xs">({meta.total} total)</span>}
           </p>
         </div>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button onClick={() => setIsModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
           <Plus className="h-4 w-4 mr-2" /> Add Driver
         </Button>
       </div>
@@ -132,6 +172,11 @@ export const Drivers = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 {search || statusFilter ? 'Try adjusting your search or filters' : 'Add your first driver to get started'}
               </p>
+              {!search && !statusFilter && (
+                <Button onClick={() => setIsModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Plus className="h-4 w-4 mr-2" /> Add First Driver
+                </Button>
+              )}
             </div>
           )
           : drivers.map((d: any) => (
@@ -211,6 +256,56 @@ export const Drivers = () => {
           </div>
         </div>
       )}
+
+      {/* Add Driver Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Driver">
+        <form onSubmit={handleAddDriver} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-medium">
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5 col-span-2">
+              <label className="text-sm font-medium text-foreground">Full Name</label>
+              <input required name="fullName" value={formData.fullName} onChange={handleFormChange} placeholder="e.g. Ramesh Kumar" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Contact Number</label>
+              <input name="contactNumber" value={formData.contactNumber} onChange={handleFormChange} placeholder="e.g. +91 9876543210" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Email (optional)</label>
+              <input type="email" name="email" value={formData.email} onChange={handleFormChange} placeholder="e.g. driver@example.com" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">License No.</label>
+              <input required name="licenseNumber" value={formData.licenseNumber} onChange={handleFormChange} placeholder="e.g. MH01202012345" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">License Category</label>
+              <select required name="licenseCategory" value={formData.licenseCategory} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="LMV">LMV (Light Motor Vehicle)</option>
+                <option value="HMV">HMV (Heavy Motor Vehicle)</option>
+                <option value="PSV">PSV (Public Service Vehicle)</option>
+                <option value="LMV_TR">LMV_TR (Transport)</option>
+                <option value="HMV_TR">HMV_TR (Transport)</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Expiry Date</label>
+              <input required type="date" name="licenseExpiryDate" value={formData.licenseExpiryDate} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+          </div>
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-border mt-2">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[100px]">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Driver'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

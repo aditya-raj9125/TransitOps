@@ -38,11 +38,8 @@ export const DriverDetail = () => {
   const licenseExpiry = driver.licenseExpiryDate ? new Date(driver.licenseExpiryDate) : null;
   const daysToExpiry = licenseExpiry ? Math.floor((licenseExpiry.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
 
-  // Mock score trend
-  const scoreTrend = Array.from({ length: 8 }, (_, i) => ({
-    month: `M${i + 1}`,
-    score: Math.max(60, score - Math.floor(Math.random() * 15) + i * 2),
-  }));
+  // Empty array to replace mock score trend
+  const scoreTrend: any[] = [];
 
   const tabs = ['overview', 'trips', 'safety'];
 

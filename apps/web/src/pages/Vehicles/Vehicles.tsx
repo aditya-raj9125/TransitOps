@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Truck, Settings, Activity, Filter, AlertTriangle, ChevronRight, X } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
+import { Modal } from '../../components/ui/Modal';
 import apiClient from '../../api/client';
+import { Loader2 } from 'lucide-react';
 
 const STATUS_CLASSES: Record<string, string> = {
   Available: 'text-status-available bg-status-available',
@@ -44,6 +45,47 @@ export const Vehicles = () => {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState<any>(null);
 
+  // Modal & Form State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    registrationNumber: '',
+    nameModel: '',
+    type: 'Truck',
+    fuelType: 'Diesel',
+    maxLoadCapacityKg: '',
+    odometerKm: '',
+    acquisitionCost: '',
+  });
+
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
+
+  const handleAddVehicle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError('');
+    try {
+      const payload = {
+        ...formData,
+        maxLoadCapacityKg: parseFloat(formData.maxLoadCapacityKg),
+        odometerKm: parseFloat(formData.odometerKm) || 0,
+        acquisitionCost: parseFloat(formData.acquisitionCost) || 0,
+      };
+      await apiClient.post('/vehicles', payload);
+      setIsModalOpen(false);
+      setFormData({ registrationNumber: '', nameModel: '', type: 'Truck', fuelType: 'Diesel', maxLoadCapacityKg: '', odometerKm: '', acquisitionCost: '' });
+      fetchVehicles(); // refresh list
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Failed to add vehicle. Please check inputs.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const fetchVehicles = async () => {
     setLoading(true);
     try {
@@ -76,7 +118,7 @@ export const Vehicles = () => {
             {meta && <span className="ml-2 text-xs">({meta.total} total)</span>}
           </p>
         </div>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+        <Button onClick={() => setIsModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
           <Plus className="h-4 w-4 mr-2" /> Add Vehicle
         </Button>
       </div>
@@ -126,7 +168,7 @@ export const Vehicles = () => {
                 {search || statusFilter ? 'Try adjusting your search or filters' : 'Add your first vehicle to get started'}
               </p>
               {!search && !statusFilter && (
-                <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                <Button onClick={() => setIsModalOpen(true)} className="bg-orange-500 hover:bg-orange-600 text-white">
                   <Plus className="h-4 w-4 mr-2" /> Add First Vehicle
                 </Button>
               )}
@@ -191,7 +233,7 @@ export const Vehicles = () => {
 
       {/* Pagination */}
       {meta && meta.total > 12 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex items-center justify-between text-sm text-muted-foreground mt-6">
           <span>Showing {vehicles.length} of {meta.total}</span>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
@@ -199,6 +241,62 @@ export const Vehicles = () => {
           </div>
         </div>
       )}
+
+      {/* Add Vehicle Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add New Vehicle">
+        <form onSubmit={handleAddVehicle} className="space-y-4">
+          {error && (
+            <div className="p-3 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-medium">
+              {error}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Registration No.</label>
+              <input required name="registrationNumber" value={formData.registrationNumber} onChange={handleFormChange} placeholder="e.g. MH-01-AB-1234" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Make & Model</label>
+              <input required name="nameModel" value={formData.nameModel} onChange={handleFormChange} placeholder="e.g. Tata LPT 1109" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Vehicle Type</label>
+              <select required name="type" value={formData.type} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="Truck">Truck</option>
+                <option value="Van">Van</option>
+                <option value="Pickup">Pickup</option>
+                <option value="Trailer">Trailer</option>
+                <option value="Bike">Bike</option>
+                <option value="EV">EV</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Fuel Type</label>
+              <select required name="fuelType" value={formData.fuelType} onChange={handleFormChange} className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary">
+                <option value="Petrol">Petrol</option>
+                <option value="Diesel">Diesel</option>
+                <option value="CNG">CNG</option>
+                <option value="Electric">Electric</option>
+                <option value="Hybrid">Hybrid</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Capacity (kg)</label>
+              <input required type="number" min="1" name="maxLoadCapacityKg" value={formData.maxLoadCapacityKg} onChange={handleFormChange} placeholder="e.g. 5000" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Odometer (km)</label>
+              <input type="number" min="0" name="odometerKm" value={formData.odometerKm} onChange={handleFormChange} placeholder="e.g. 15000" className="w-full h-9 px-3 rounded-lg border border-input bg-background text-sm focus:ring-2 focus:ring-primary focus:border-primary" />
+            </div>
+          </div>
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-border mt-2">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700 text-white min-w-[100px]">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Vehicle'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

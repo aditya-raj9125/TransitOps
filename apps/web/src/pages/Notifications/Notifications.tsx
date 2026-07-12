@@ -47,7 +47,7 @@ export const Notifications = () => {
 
   const markAllRead = async () => {
     try {
-      await apiClient.post('/notifications/mark-all-read');
+      await apiClient.patch('/notifications/read-all');
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     } catch (err) { console.error(err); }
   };

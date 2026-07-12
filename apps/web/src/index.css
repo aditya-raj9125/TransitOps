@@ -131,6 +131,22 @@
     line-height: 1.15;
     font-weight: 700;
   }
+
+  /* Custom Scrollbar Styles */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
 }
 
 @layer utilities {
@@ -162,3 +178,13 @@
   .text-status-retired { color: hsl(var(--status-retired-text)); }
   .bg-status-retired { background-color: hsl(var(--status-retired-bg)); }
 }
+
+/* React Big Calendar Overrides */
+.calendar-custom .rbc-event { background: transparent !important; padding: 0 !important; border: none !important; }
+.calendar-custom .rbc-day-bg { transition: background 0.2s; }
+.calendar-custom .rbc-day-bg:hover { background: hsl(var(--muted)/0.3); }
+.calendar-custom .rbc-off-range-bg { background: hsl(var(--muted)/0.1); }
+.calendar-custom .rbc-header { padding: 8px 0; font-weight: 600; color: hsl(var(--muted-foreground)); border-bottom: 1px solid hsl(var(--border)); }
+.calendar-custom .rbc-month-view, .calendar-custom .rbc-time-view, .calendar-custom .rbc-agenda-view { border: 1px solid hsl(var(--border)); border-radius: 8px; overflow: hidden; background: hsl(var(--card)); }
+.calendar-custom .rbc-day-bg + .rbc-day-bg { border-left: 1px solid hsl(var(--border)); }
+.calendar-custom .rbc-month-row + .rbc-month-row { border-top: 1px solid hsl(var(--border)); }

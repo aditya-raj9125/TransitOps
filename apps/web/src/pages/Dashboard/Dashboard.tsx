@@ -15,21 +15,8 @@ import apiClient from '../../api/client';
 
 const COLORS = ['#4F46E5', '#F97316', '#A855F7', '#10B981'];
 
-const utilizationData = [
-  { date: 'Jun 13', utilization: 65 }, { date: 'Jun 14', utilization: 72 },
-  { date: 'Jun 15', utilization: 58 }, { date: 'Jun 16', utilization: 80 },
-  { date: 'Jun 17', utilization: 75 }, { date: 'Jun 18', utilization: 88 },
-  { date: 'Jun 19', utilization: 70 }, { date: 'Jun 20', utilization: 84 },
-  { date: 'Jun 21', utilization: 79 }, { date: 'Jun 22', utilization: 91 },
-  { date: 'Jun 23', utilization: 85 }, { date: 'Jun 24', utilization: 89 },
-];
-
-const costData = [
-  { name: 'Fuel', value: 45, color: '#4F46E5' },
-  { name: 'Maintenance', value: 28, color: '#A855F7' },
-  { name: 'Tolls', value: 15, color: '#F97316' },
-  { name: 'Other', value: 12, color: '#6B7280' },
-];
+const utilizationData: any[] = [];
+const costData: any[] = [];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload?.length) {
@@ -308,20 +295,6 @@ export const Dashboard = () => {
                   </div>
                 </div>
               ))
-            )}
-            {!loading && alerts.length === 0 && (
-              <div className="space-y-2">
-                {[
-                  { msg: 'License expiring in 7 days — Driver Raj Kumar', type: 'warning' },
-                  { msg: 'Maintenance due — Vehicle MH-12-AB-1234', type: 'maintenance' },
-                  { msg: 'Insurance renewal pending — VAN-003', type: 'warning' },
-                ].map((a, i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-border">
-                    <div className={`mt-0.5 h-2 w-2 rounded-full shrink-0 ${a.type === 'maintenance' ? 'bg-purple-500' : 'bg-orange-500'}`} />
-                    <p className="text-xs text-foreground leading-tight">{a.msg}</p>
-                  </div>
-                ))}
-              </div>
             )}
           </CardContent>
         </Card>
