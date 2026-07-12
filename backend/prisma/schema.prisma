@@ -1,0 +1,560 @@
+// =============================================================================
+// FleetPilot — Prisma Schema
+// PostgreSQL 15 | Prisma ORM
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum VehicleType {
+  Truck
+  Van
+  Pickup
+  Trailer
+  Bike
+  EV
+}
+
+enum FuelType {
+  Petrol
+  Diesel
+  CNG
+  Electric
+  Hybrid
+}
+
+enum VehicleStatus {
+  Available
+  OnTrip
+  InShop
+  Retired
+}
+
+enum DriverStatus {
+  Available
+  OnTrip
+  OffDuty
+  Suspended
+}
+
+enum LicenseCategory {
+  LMV
+  HMV
+  PSV
+  LMV_TR
+  HMV_TR
+  Other
+}
+
+enum TripStatus {
+  Draft
+  Dispatched
+  Completed
+  Cancelled
+}
+
+enum MaintenanceType {
+  OilChange
+  Tires
+  Brakes
+  GeneralService
+  Repair
+  Inspection
+}
+
+enum MaintenanceStatus {
+  Open
+  Closed
+}
+
+enum ExpenseCategory {
+  Toll
+  Parking
+  Fine
+  Permit
+  Maintenance
+  Misc
+}
+
+enum DocumentEntityType {
+  Vehicle
+  Driver
+}
+
+enum DocumentType {
+  Insurance
+  RC
+  Permit
+  License
+  PUC
+  Other
+}
+
+enum NotificationType {
+  license_expiry
+  insurance_expiry
+  maintenance_due
+  dispatch_conflict
+  document_expiry
+  permit_expiry
+  puc_expiry
+}
+
+enum UserRole {
+  Admin
+  FleetManager
+  Dispatcher
+  SafetyOfficer
+  FinancialAnalyst
+}
+
+enum ThemePreference {
+  light
+  dark
+  system
+}
+
+// =============================================================================
+// CORE ENTITIES
+// =============================================================================
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  timezone  String   @default("Asia/Kolkata")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  regions       Region[]
+  users         User[]
+  vehicles      Vehicle[]
+  drivers       Driver[]
+  routes        Route[]
+  trips         Trip[]
+  maintenanceLogs MaintenanceLog[]
+  fuelLogs      FuelLog[]
+  expenses      Expense[]
+  documents     Document[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+model Region {
+  id     String @id @default(uuid())
+  name   String
+  code   String
+
+  orgId  String @map("org_id")
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+
+  vehicles Vehicle[]
+  drivers  Driver[]
+  trips    Trip[]
+
+  @@unique([orgId, code])
+  @@map("regions")
+}
+
+model Role {
+  id          String @id @default(uuid())
+  name        UserRole @unique
+  description String?
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model RolePermission {
+  id       String @id @default(uuid())
+  roleId   String @map("role_id")
+  role     Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  resource String // e.g. "vehicles", "trips", "drivers"
+  action   String // create | read | update | delete | export
+
+  @@unique([roleId, resource, action])
+  @@map("role_permissions")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  orgId          String          @map("org_id")
+  org            Organization    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  fullName       String          @map("full_name")
+  email          String          @unique
+  passwordHash   String          @map("password_hash")
+  phone          String?
+  avatarUrl      String?         @map("avatar_url")
+  roleId         String          @map("role_id")
+  role           Role            @relation(fields: [roleId], references: [id])
+  isActive       Boolean         @default(true) @map("is_active")
+  themePreference ThemePreference @default(system) @map("theme_preference")
+  lastLoginAt    DateTime?       @map("last_login_at")
+  deletedAt      DateTime?       @map("deleted_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  refreshTokens  RefreshToken[]
+  createdTrips   Trip[]          @relation("TripCreatedBy")
+  auditLogs      AuditLog[]
+  notifications  Notification[]  @relation("NotificationTargetUser")
+  createdMaintenanceLogs MaintenanceLog[] @relation("MaintenanceCreatedBy")
+  createdFuelLogs FuelLog[]      @relation("FuelLogCreatedBy")
+  createdExpenses Expense[]      @relation("ExpenseCreatedBy")
+  uploadedDocuments Document[]   @relation("DocumentUploadedBy")
+  vehicleStatusChanges VehicleStatusHistory[] @relation("VehicleStatusChangedBy")
+  driverStatusChanges DriverStatusHistory[] @relation("DriverStatusChangedBy")
+
+  @@index([email])
+  @@index([orgId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// =============================================================================
+// FLEET ENTITIES
+// =============================================================================
+
+model Vehicle {
+  id                   String        @id @default(uuid())
+  orgId                String        @map("org_id")
+  org                  Organization  @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  registrationNumber   String        @map("registration_number")
+  nameModel            String        @map("name_model")
+  type                 VehicleType
+  maxLoadCapacityKg    Decimal       @map("max_load_capacity_kg") @db.Decimal(10, 2)
+  odometerKm           Decimal       @default(0) @map("odometer_km") @db.Decimal(10, 2)
+  acquisitionCost      Decimal       @map("acquisition_cost") @db.Decimal(12, 2)
+  acquisitionDate      DateTime?     @map("acquisition_date") @db.Date
+  fuelType             FuelType      @map("fuel_type")
+  status               VehicleStatus @default(Available)
+  regionId             String?       @map("region_id")
+  region               Region?       @relation(fields: [regionId], references: [id])
+  insuranceExpiryDate  DateTime?     @map("insurance_expiry_date") @db.Date
+  permitExpiryDate     DateTime?     @map("permit_expiry_date") @db.Date
+  pucExpiryDate        DateTime?     @map("puc_expiry_date") @db.Date
+  notes                String?
+  deletedAt            DateTime?     @map("deleted_at")
+  createdAt            DateTime      @default(now()) @map("created_at")
+  updatedAt            DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  trips           Trip[]
+  maintenanceLogs MaintenanceLog[]
+  fuelLogs        FuelLog[]
+  expenses        Expense[]
+  documents       Document[]       @relation("VehicleDocuments")
+  statusHistory   VehicleStatusHistory[]
+
+  @@unique([orgId, registrationNumber])
+  @@index([orgId, status])
+  @@index([status])
+  @@map("vehicles")
+}
+
+model VehicleStatusHistory {
+  id         String        @id @default(uuid())
+  vehicleId  String        @map("vehicle_id")
+  vehicle    Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  oldStatus  VehicleStatus? @map("old_status")
+  newStatus  VehicleStatus @map("new_status")
+  changedById String?      @map("changed_by_id")
+  changedBy  User?         @relation("VehicleStatusChangedBy", fields: [changedById], references: [id])
+  reason     String?
+  changedAt  DateTime      @default(now()) @map("changed_at")
+
+  @@index([vehicleId])
+  @@map("vehicle_status_history")
+}
+
+model Driver {
+  id                   String         @id @default(uuid())
+  orgId                String         @map("org_id")
+  org                  Organization   @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  fullName             String         @map("full_name")
+  licenseNumber        String         @map("license_number")
+  licenseCategory      LicenseCategory @map("license_category")
+  licenseExpiryDate    DateTime       @map("license_expiry_date") @db.Date
+  contactNumber        String?        @map("contact_number")
+  email                String?
+  safetyScore          Int            @default(100) @map("safety_score")
+  status               DriverStatus   @default(Available)
+  regionId             String?        @map("region_id")
+  region               Region?        @relation(fields: [regionId], references: [id])
+  dateJoined           DateTime?      @map("date_joined") @db.Date
+  lastTripCompletedAt  DateTime?      @map("last_trip_completed_at")
+  totalTripsCompleted  Int            @default(0) @map("total_trips_completed")
+  deletedAt            DateTime?      @map("deleted_at")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  trips         Trip[]
+  documents     Document[]           @relation("DriverDocuments")
+  statusHistory DriverStatusHistory[]
+
+  @@unique([orgId, licenseNumber])
+  @@index([orgId, status])
+  @@index([licenseExpiryDate])
+  @@index([lastTripCompletedAt])
+  @@index([status])
+  @@map("drivers")
+}
+
+model DriverStatusHistory {
+  id         String       @id @default(uuid())
+  driverId   String       @map("driver_id")
+  driver     Driver       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  oldStatus  DriverStatus? @map("old_status")
+  newStatus  DriverStatus @map("new_status")
+  changedById String?     @map("changed_by_id")
+  changedBy  User?        @relation("DriverStatusChangedBy", fields: [changedById], references: [id])
+  reason     String?
+  changedAt  DateTime     @default(now()) @map("changed_at")
+
+  @@index([driverId])
+  @@map("driver_status_history")
+}
+
+model Route {
+  id              String       @id @default(uuid())
+  orgId           String       @map("org_id")
+  org             Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  source          String
+  destination     String
+  sourceLat       Float?       @map("source_lat")
+  sourceLng       Float?       @map("source_lng")
+  destinationLat  Float?       @map("destination_lat")
+  destinationLng  Float?       @map("destination_lng")
+  avgDistanceKm   Decimal?     @map("avg_distance_km") @db.Decimal(8, 2)
+  timesUsed       Int          @default(0) @map("times_used")
+  createdAt       DateTime     @default(now()) @map("created_at")
+
+  trips Trip[]
+
+  @@index([orgId, source, destination])
+  @@map("routes")
+}
+
+// =============================================================================
+// OPERATIONS
+// =============================================================================
+
+model Trip {
+  id                 String     @id @default(uuid())
+  orgId              String     @map("org_id")
+  org                Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  tripCode           String     @unique @map("trip_code")
+  routeId            String?    @map("route_id")
+  route              Route?     @relation(fields: [routeId], references: [id])
+  source             String
+  destination        String
+  vehicleId          String     @map("vehicle_id")
+  vehicle            Vehicle    @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  driverId           String     @map("driver_id")
+  driver             Driver     @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  cargoWeightKg      Decimal    @map("cargo_weight_kg") @db.Decimal(10, 2)
+  plannedDistanceKm  Decimal?   @map("planned_distance_km") @db.Decimal(8, 2)
+  actualDistanceKm   Decimal?   @map("actual_distance_km") @db.Decimal(8, 2)
+  status             TripStatus @default(Draft)
+  scheduledStart     DateTime   @map("scheduled_start")
+  actualStart        DateTime?  @map("actual_start")
+  actualEnd          DateTime?  @map("actual_end")
+  fuelConsumedLiters Decimal?   @map("fuel_consumed_liters") @db.Decimal(8, 2)
+  revenueAmount      Decimal?   @map("revenue_amount") @db.Decimal(12, 2)
+  createdById        String     @map("created_by_id")
+  createdBy          User       @relation("TripCreatedBy", fields: [createdById], references: [id])
+  cancellationReason String?    @map("cancellation_reason")
+  regionId           String?    @map("region_id")
+  region             Region?    @relation(fields: [regionId], references: [id])
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  fuelLogs FuelLog[]
+  expenses Expense[]
+
+  @@index([orgId, status, scheduledStart])
+  @@index([vehicleId])
+  @@index([driverId])
+  @@index([status])
+  @@map("trips")
+}
+
+model MaintenanceLog {
+  id              String            @id @default(uuid())
+  orgId           String            @map("org_id")
+  org             Organization      @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  vehicleId       String            @map("vehicle_id")
+  vehicle         Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  maintenanceType MaintenanceType   @map("maintenance_type")
+  description     String?
+  status          MaintenanceStatus @default(Open)
+  cost            Decimal?          @db.Decimal(12, 2)
+  scheduledDate   DateTime?         @map("scheduled_date") @db.Date
+  completedDate   DateTime?         @map("completed_date") @db.Date
+  vendorName      String?           @map("vendor_name")
+  createdById     String?           @map("created_by_id")
+  createdBy       User?             @relation("MaintenanceCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@index([vehicleId])
+  @@index([orgId, status])
+  @@map("maintenance_logs")
+}
+
+// =============================================================================
+// FINANCE
+// =============================================================================
+
+model FuelLog {
+  id             String       @id @default(uuid())
+  orgId          String       @map("org_id")
+  org            Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  vehicleId      String       @map("vehicle_id")
+  vehicle        Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  tripId         String?      @map("trip_id")
+  trip           Trip?        @relation(fields: [tripId], references: [id])
+  liters         Decimal      @db.Decimal(8, 2)
+  cost           Decimal      @db.Decimal(10, 2)
+  odometerReading Decimal?    @map("odometer_reading") @db.Decimal(10, 2)
+  fuelStation    String?      @map("fuel_station")
+  logDate        DateTime     @map("log_date") @db.Date
+  createdById    String?      @map("created_by_id")
+  createdBy      User?        @relation("FuelLogCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([vehicleId])
+  @@index([orgId, logDate])
+  @@map("fuel_logs")
+}
+
+model Expense {
+  id               String          @id @default(uuid())
+  orgId            String          @map("org_id")
+  org              Organization    @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  vehicleId        String?         @map("vehicle_id")
+  vehicle          Vehicle?        @relation(fields: [vehicleId], references: [id])
+  tripId           String?         @map("trip_id")
+  trip             Trip?           @relation(fields: [tripId], references: [id])
+  category         ExpenseCategory
+  amount           Decimal         @db.Decimal(12, 2)
+  expenseDate      DateTime        @map("expense_date") @db.Date
+  description      String?
+  receiptDocumentId String?        @map("receipt_document_id")
+  createdById      String?         @map("created_by_id")
+  createdBy        User?           @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  createdAt        DateTime        @default(now()) @map("created_at")
+
+  receiptDocument Document? @relation("ExpenseReceipt", fields: [receiptDocumentId], references: [id])
+
+  @@index([vehicleId])
+  @@index([orgId, expenseDate])
+  @@map("expenses")
+}
+
+// =============================================================================
+// DOCUMENTS & COMPLIANCE
+// =============================================================================
+
+model Document {
+  id          String             @id @default(uuid())
+  orgId       String             @map("org_id")
+  org         Organization       @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  entityType  DocumentEntityType @map("entity_type")
+  vehicleId   String?            @map("vehicle_id")
+  vehicle     Vehicle?           @relation("VehicleDocuments", fields: [vehicleId], references: [id])
+  driverId    String?            @map("driver_id")
+  driver      Driver?            @relation("DriverDocuments", fields: [driverId], references: [id])
+  docType     DocumentType       @map("doc_type")
+  fileName    String             @map("file_name")
+  fileUrl     String             @map("file_url")
+  fileSize    Int?               @map("file_size")
+  mimeType    String?            @map("mime_type")
+  expiryDate  DateTime?          @map("expiry_date") @db.Date
+  uploadedById String?           @map("uploaded_by_id")
+  uploadedBy  User?              @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+  uploadedAt  DateTime           @default(now()) @map("uploaded_at")
+
+  expenseReceipts Expense[] @relation("ExpenseReceipt")
+
+  @@index([expiryDate])
+  @@index([entityType, vehicleId])
+  @@index([entityType, driverId])
+  @@map("documents")
+}
+
+// =============================================================================
+// NOTIFICATIONS & AUDIT
+// =============================================================================
+
+model Notification {
+  id                String           @id @default(uuid())
+  orgId             String           @map("org_id")
+  org               Organization     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  targetUserId      String?          @map("target_user_id")
+  targetUser        User?            @relation("NotificationTargetUser", fields: [targetUserId], references: [id])
+  targetRole        UserRole?        @map("target_role")
+  type              NotificationType
+  message           String
+  isRead            Boolean          @default(false) @map("is_read")
+  relatedEntityType String?          @map("related_entity_type")
+  relatedEntityId   String?          @map("related_entity_id")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  @@index([orgId, isRead])
+  @@index([targetUserId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id          String       @id @default(uuid())
+  orgId       String       @map("org_id")
+  org         Organization @relation(fields: [orgId], references: [id], onDelete: Restrict)
+  userId      String?      @map("user_id")
+  user        User?        @relation(fields: [userId], references: [id])
+  action      String       // CREATE | UPDATE | DELETE | LOGIN | LOGOUT | DISPATCH | COMPLETE | CANCEL
+  entityType  String       @map("entity_type") // Vehicle | Driver | Trip | etc.
+  entityId    String?      @map("entity_id")
+  description String?
+  oldValue    Json?        @map("old_value")
+  newValue    Json?        @map("new_value")
+  ipAddress   String?      @map("ip_address")
+  userAgent   String?      @map("user_agent")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([orgId, createdAt])
+  @@map("audit_logs")
+}
