@@ -4,10 +4,24 @@ import { useAuthStore } from '@/store/authStore';
 import { useUiStore } from '@/store/uiStore';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { useSocket } from '../../hooks/useSocket';
 
 export const GlobalLayout = () => {
   const { isAuthenticated } = useAuthStore();
   const { sidebarOpen, globalLoading } = useUiStore();
+  const socket = useSocket();
+
+  React.useEffect(() => {
+    if (socket) {
+      socket.on('vehicleUpdated', (data) => {
+        console.log('Vehicle updated real-time', data);
+        // Could dispatch a toast here
+      });
+      socket.on('notificationCreated', (data) => {
+        console.log('New notification', data);
+      });
+    }
+  }, [socket]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
