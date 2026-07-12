@@ -1,73 +1,101 @@
 import React, { useState } from 'react';
-import { useAuthStore } from '@/store/authStore';
-import { useUiStore } from '@/store/uiStore';
-import { Bell, Menu, Search, User, LogOut } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
+import { Bell, Search, Settings, User, LogOut, Moon, Sun } from 'lucide-react';
 
 export const Header = () => {
-  const { user, logout } = useAuthStore();
-  const { toggleSidebar } = useUiStore();
+  const { user, clearAuth } = useAuthStore();
+  const navigate = useNavigate();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
+
+  const toggleDark = () => {
+    document.documentElement.classList.toggle('dark');
+    const next = !darkMode;
+    setDarkMode(next);
+    localStorage.setItem('theme', next ? 'dark' : 'light');
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    navigate('/login');
+  };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border bg-card px-4 shadow-sm md:px-6">
-      <div className="flex items-center gap-4">
-        <button
-          onClick={toggleSidebar}
-          className="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        
-        <div className="hidden md:flex relative w-64 items-center">
-          <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" />
+    <header className="sticky top-0 z-40 h-16 flex items-center justify-between border-b border-border bg-card/80 backdrop-blur-sm px-4 md:px-6 shrink-0">
+      {/* Left: Global Search */}
+      <div className="flex items-center gap-3 flex-1">
+        <div className="hidden md:flex relative max-w-sm w-full items-center">
+          <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search trips, vehicles..."
-            className="h-9 w-full rounded-md border border-input bg-transparent pl-9 pr-4 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            placeholder='Search vehicles, drivers, trips...'
+            className="h-9 w-full rounded-xl border border-input bg-muted/50 pl-9 pr-4 text-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:bg-background"
           />
+          <kbd className="absolute right-3 text-[10px] text-muted-foreground bg-muted border border-border rounded px-1.5 py-0.5 hidden xl:block">⌘K</kbd>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button className="relative rounded-full p-2 text-muted-foreground hover:bg-muted transition-colors">
-          <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-          </span>
+      {/* Right: Controls */}
+      <div className="flex items-center gap-2">
+        {/* Dark Mode Toggle */}
+        <button
+          onClick={toggleDark}
+          className="h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
 
+        {/* Notifications Bell */}
+        <Link to="/notifications"
+          className="relative h-9 w-9 flex items-center justify-center rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+          <Bell className="h-4 w-4" />
+          <span className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-orange-500" />
+        </Link>
+
+        <div className="w-px h-6 bg-border mx-1" />
+
+        {/* User Menu */}
         <div className="relative">
-          <button 
+          <button
             onClick={() => setProfileOpen(!profileOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+            className="flex items-center gap-2.5 h-9 px-2 rounded-xl hover:bg-muted transition-colors"
           >
-            {user?.avatarUrl ? (
-              <img src={user.avatarUrl} alt="Avatar" className="h-9 w-9 rounded-full object-cover" />
-            ) : (
-              <User className="h-5 w-5" />
-            )}
-          </button>
-          
-          {profileOpen && (
-            <div className="absolute right-0 mt-2 w-56 origin-top-right rounded-md border border-border bg-popover shadow-lg outline-none animate-in fade-in zoom-in-95 duration-200">
-              <div className="px-4 py-3 border-b border-border">
-                <p className="text-sm font-medium leading-none">{user?.fullName || 'User'}</p>
-                <p className="text-xs text-muted-foreground mt-1">{user?.email}</p>
-              </div>
-              <div className="p-1">
-                <button
-                  onClick={() => {
-                    logout();
-                    window.location.href = '/login';
-                  }}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-destructive hover:bg-muted transition-colors"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </button>
-              </div>
+            <div className="h-7 w-7 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+              {user?.fullName?.[0] ?? 'U'}
             </div>
+            <div className="hidden lg:block text-left">
+              <p className="text-xs font-semibold text-foreground leading-tight">{user?.fullName ?? 'User'}</p>
+              <p className="text-[10px] text-muted-foreground">{user?.role ?? 'Admin'}</p>
+            </div>
+          </button>
+
+          {profileOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setProfileOpen(false)} />
+              <div className="absolute right-0 top-12 z-20 w-52 rounded-xl border border-border bg-popover shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-4 py-3 border-b border-border bg-muted/30">
+                  <p className="text-sm font-semibold text-foreground">{user?.fullName || 'User'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                </div>
+                <div className="p-1">
+                  <Link to="/profile" onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg text-foreground hover:bg-muted transition-colors">
+                    <User className="h-4 w-4 text-muted-foreground" /> My Profile
+                  </Link>
+                  <Link to="/settings" onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg text-foreground hover:bg-muted transition-colors">
+                    <Settings className="h-4 w-4 text-muted-foreground" /> Settings
+                  </Link>
+                  <div className="my-1 h-px bg-border" />
+                  <button onClick={handleLogout}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                    <LogOut className="h-4 w-4" /> Sign out
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

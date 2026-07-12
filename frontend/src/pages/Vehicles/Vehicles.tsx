@@ -1,22 +1,58 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Plus, Search, Truck, Settings, Activity, Filter, AlertTriangle, ChevronRight, X } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
-import { Plus, Search, Truck, Settings, Activity } from 'lucide-react';
+import { Badge } from '../../components/ui/Badge';
 import apiClient from '../../api/client';
+
+const STATUS_CLASSES: Record<string, string> = {
+  Available: 'text-status-available bg-status-available',
+  OnTrip: 'text-status-ontrip bg-status-ontrip',
+  InShop: 'text-status-maintenance bg-status-maintenance',
+  Retired: 'text-status-retired bg-status-retired',
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  Available: 'Available', OnTrip: 'On Trip', InShop: 'In Shop', Retired: 'Retired',
+};
+
+const SkeletonCard = () => (
+  <Card className="animate-pulse">
+    <CardContent className="p-6 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 bg-muted rounded-xl" />
+        <div className="space-y-2 flex-1">
+          <div className="h-4 bg-muted rounded w-24" />
+          <div className="h-3 bg-muted rounded w-16" />
+        </div>
+        <div className="h-6 bg-muted rounded-full w-16" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="h-8 bg-muted rounded" />
+        <div className="h-8 bg-muted rounded" />
+      </div>
+    </CardContent>
+  </Card>
+);
 
 export const Vehicles = () => {
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchVehicles();
-  }, []);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState<any>(null);
 
   const fetchVehicles = async () => {
+    setLoading(true);
     try {
-      const res = await apiClient.get('/vehicles');
-      setVehicles(res.data.data);
+      const params = new URLSearchParams({ page: String(page), pageSize: '12' });
+      if (search) params.set('q', search);
+      if (statusFilter) params.set('status', statusFilter);
+      const res = await apiClient.get(`/vehicles?${params}`);
+      setVehicles(res.data?.data || []);
+      setMeta(res.data?.meta || null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -24,76 +60,145 @@ export const Vehicles = () => {
     }
   };
 
+  useEffect(() => {
+    const timer = setTimeout(fetchVehicles, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search, statusFilter, page]);
+
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Vehicles</h2>
-          <p className="text-muted-foreground mt-1">Manage fleet, status, and maintenance history.</p>
+          <h1 className="text-2xl font-bold text-foreground">Vehicle Registry</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Manage fleet assets, status, and maintenance history
+            {meta && <span className="ml-2 text-xs">({meta.total} total)</span>}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button><Plus className="h-4 w-4 mr-2" /> Add Vehicle</Button>
-        </div>
+        <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+          <Plus className="h-4 w-4 mr-2" /> Add Vehicle
+        </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search registration or model..."
-            className="h-9 w-full rounded-md border border-input bg-card pl-9 pr-4 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            placeholder="Search registration number, model..."
+            className="w-full h-9 pl-9 pr-4 rounded-xl border border-input bg-card text-sm focus:outline-none focus:ring-2 focus:ring-primary transition-all"
           />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="h-9 rounded-xl border border-input bg-card text-sm px-3 focus:outline-none focus:ring-2 focus:ring-primary min-w-[140px]"
+        >
+          <option value="">All Statuses</option>
+          <option value="Available">Available</option>
+          <option value="OnTrip">On Trip</option>
+          <option value="InShop">In Shop</option>
+          <option value="Retired">Retired</option>
+        </select>
       </div>
 
+      {/* Grid */}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {loading ? (
-           Array.from({ length: 6 }).map((_, i) => (
-             <Card key={i} className="animate-pulse h-48"></Card>
-           ))
-        ) : (
-          vehicles.map((v) => (
-            <Card key={v.id} className="hover:border-primary/50 transition-colors">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
+        {loading
+          ? Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)
+          : vehicles.length === 0
+          ? (
+            <div className="col-span-3 py-20 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-4">
+                <Truck className="h-8 w-8 text-indigo-400" />
+              </div>
+              <p className="font-semibold text-foreground mb-1">No vehicles found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {search || statusFilter ? 'Try adjusting your search or filters' : 'Add your first vehicle to get started'}
+              </p>
+              {!search && !statusFilter && (
+                <Button className="bg-orange-500 hover:bg-orange-600 text-white">
+                  <Plus className="h-4 w-4 mr-2" /> Add First Vehicle
+                </Button>
+              )}
+            </div>
+          )
+          : vehicles.map((v: any) => (
+            <Card key={v.id} className="group hover:border-indigo-200 hover:shadow-md transition-all duration-200">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-primary/10 text-primary rounded-lg">
-                      <Truck className="h-6 w-6" />
+                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl group-hover:bg-indigo-100 transition-colors">
+                      <Truck className="h-5 w-5" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-lg leading-none">{v.registrationNumber}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">{v.nameModel}</p>
+                      <h3 className="font-bold text-foreground">{v.registrationNumber}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5">{v.nameModel}</p>
                     </div>
                   </div>
-                  <Badge variant={
-                    v.status === 'Available' ? 'default' :
-                    v.status === 'InTransit' ? 'secondary' : 'destructive'
-                  }>
-                    {v.status}
-                  </Badge>
+                  <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full ${STATUS_CLASSES[v.status] || 'bg-muted text-muted-foreground'}`}>
+                    {STATUS_LABELS[v.status] || v.status}
+                  </span>
                 </div>
-                
-                <div className="mt-6 grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground text-xs">Type</p>
-                    <p className="font-medium mt-0.5">{v.type}</p>
+
+                <div className="grid grid-cols-3 gap-3 text-xs mb-4">
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <p className="text-muted-foreground mb-0.5">Type</p>
+                    <p className="font-semibold text-foreground truncate">{v.type}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground text-xs">Current Mileage</p>
-                    <p className="font-medium mt-0.5">{v.currentMileage.toLocaleString()} km</p>
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <p className="text-muted-foreground mb-0.5">Capacity</p>
+                    <p className="font-semibold text-foreground">{v.maxLoadCapacityKg?.toLocaleString() ?? '—'} kg</p>
+                  </div>
+                  <div className="bg-muted/40 rounded-lg p-2">
+                    <p className="text-muted-foreground mb-0.5">Odometer</p>
+                    <p className="font-semibold text-foreground">{v.odometerKm?.toLocaleString() ?? '—'} km</p>
                   </div>
                 </div>
-                
-                <div className="mt-6 flex gap-2">
-                  <Button variant="outline" size="sm" className="w-full"><Activity className="h-4 w-4 mr-2" /> History</Button>
-                  <Button variant="outline" size="sm" className="w-full"><Settings className="h-4 w-4 mr-2" /> Manage</Button>
+
+                {/* Insurance expiry warning */}
+                {v.insuranceExpiryDate && new Date(v.insuranceExpiryDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && (
+                  <div className="flex items-center gap-2 text-[10px] text-orange-600 bg-orange-50 rounded-lg px-2.5 py-1.5 mb-3">
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    Insurance expires {new Date(v.insuranceExpiryDate).toLocaleDateString()}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Link to={`/vehicles/${v.id}`} className="flex-1">
+                    <Button variant="outline" size="sm" className="w-full text-xs h-8">
+                      <Activity className="h-3 w-3 mr-1.5" /> View Details
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" className="h-8 px-2.5">
+                    <Settings className="h-3 w-3" />
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           ))
-        )}
+        }
       </div>
+
+      {/* Pagination */}
+      {meta && meta.total > 12 && (
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>Showing {vehicles.length} of {meta.total}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
+            <Button variant="outline" size="sm" disabled={vehicles.length < 12} onClick={() => setPage(p => p + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

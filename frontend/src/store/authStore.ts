@@ -17,6 +17,7 @@ interface AuthState {
   isAuthenticated: boolean;
   setAuth: (user: User, accessToken: string) => void;
   setAccessToken: (token: string) => void;
+  clearAuth: () => void;
   logout: () => void;
 }
 
@@ -28,11 +29,12 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       setAuth: (user, accessToken) => set({ user, accessToken, isAuthenticated: true }),
       setAccessToken: (accessToken) => set({ accessToken }),
+      clearAuth: () => set({ user: null, accessToken: null, isAuthenticated: false }),
       logout: () => set({ user: null, accessToken: null, isAuthenticated: false }),
     }),
     {
-      name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }), // Don't persist access token in local storage, keep it in memory
+      name: 'fleetpilot-auth',
+      partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
     }
   )
 );

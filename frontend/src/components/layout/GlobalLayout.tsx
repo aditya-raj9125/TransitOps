@@ -1,27 +1,13 @@
-import React from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
-import { useUiStore } from '@/store/uiStore';
+import React, { useState } from 'react';
+import { Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
+import { useUiStore } from '../../store/uiStore';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
-import { useSocket } from '../../hooks/useSocket';
 
 export const GlobalLayout = () => {
   const { isAuthenticated } = useAuthStore();
-  const { sidebarOpen, globalLoading } = useUiStore();
-  const socket = useSocket();
-
-  React.useEffect(() => {
-    if (socket) {
-      socket.on('vehicleUpdated', (data) => {
-        console.log('Vehicle updated real-time', data);
-        // Could dispatch a toast here
-      });
-      socket.on('notificationCreated', (data) => {
-        console.log('New notification', data);
-      });
-    }
-  }, [socket]);
+  const { sidebarOpen, setSidebarOpen } = useUiStore();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -29,28 +15,16 @@ export const GlobalLayout = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Sidebar - Desktop */}
-      <div
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
-        } transition-all duration-300 ease-in-out border-r border-border hidden md:flex flex-col bg-card`}
-      >
-        <Sidebar collapsed={!sidebarOpen} />
+      {/* Sidebar */}
+      <div className={`shrink-0 transition-all duration-200 ${sidebarOpen ? 'w-60' : 'w-[72px]'}`}>
+        <Sidebar collapsed={!sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} />
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 overflow-hidden w-full relative">
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <Header />
-        
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 bg-muted/20">
-          <div className="mx-auto max-w-7xl relative h-full">
-            {globalLoading && (
-              <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-lg">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent"></div>
-              </div>
-            )}
-            <Outlet />
-          </div>
+        <main className="flex-1 overflow-y-auto p-6">
+          <Outlet />
         </main>
       </div>
     </div>
