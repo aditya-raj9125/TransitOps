@@ -157,13 +157,13 @@ export class TripsService {
       async (tx) => {
         // Double-check availability inside transaction (prevent TOCTOU)
         const vehicle = await tx.vehicle.findUnique({ where: { id: trip.vehicleId } });
-        if (vehicle.status !== VehicleStatus.Available) {
-          throw new ConflictException(`Vehicle ${vehicle.registrationNumber} is no longer available`);
+        if (!vehicle || vehicle.status !== VehicleStatus.Available) {
+          throw new ConflictException(`Vehicle ${vehicle?.registrationNumber || trip.vehicleId} is no longer available`);
         }
 
         const driver = await tx.driver.findUnique({ where: { id: trip.driverId } });
-        if (driver.status !== DriverStatus.Available) {
-          throw new ConflictException(`Driver ${driver.fullName} is no longer available`);
+        if (!driver || driver.status !== DriverStatus.Available) {
+          throw new ConflictException(`Driver ${driver?.fullName || trip.driverId} is no longer available`);
         }
 
         const [updatedTrip] = await Promise.all([
@@ -309,7 +309,7 @@ export class TripsService {
       include: { vehicle: true, driver: true },
     });
     if (!trip) throw new NotFoundException(`Trip ${id} not found`);
-    if (![TripStatus.Draft, TripStatus.Dispatched].includes(trip.status)) {
+    if (trip.status !== TripStatus.Draft && trip.status !== TripStatus.Dispatched) {
       throw new BadRequestException(`Trip is ${trip.status} — cannot be cancelled`);
     }
 
@@ -511,7 +511,7 @@ export class TripsService {
     if (!overrideRestTime) {
       const restThresholdHours = Number(this.config.get('DRIVER_REST_THRESHOLD_HOURS') || 2);
       const driver = await this.prisma.driver.findUnique({ where: { id: trip.driverId } });
-      if (driver.lastTripCompletedAt) {
+      if (driver?.lastTripCompletedAt) {
         const hoursSinceLast = (Date.now() - driver.lastTripCompletedAt.getTime()) / 3600000;
         if (hoursSinceLast < restThresholdHours) {
           throw new BadRequestException({

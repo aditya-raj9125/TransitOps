@@ -24,7 +24,7 @@ export class VehiclesService {
     const where: Prisma.VehicleWhereInput = {
       orgId,
       deletedAt: null,
-      ...(status && { status }),
+      ...(status && { status: status as VehicleStatus }),
       ...(type && { type }),
       ...(regionId && { regionId }),
       ...(q && {

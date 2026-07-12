@@ -94,7 +94,7 @@ export class AuthService {
         },
       });
 
-      let validToken = null;
+      let validToken: any = null;
       for (const stored of storedTokens) {
         if (await argon2.verify(stored.tokenHash, refreshToken)) {
           validToken = stored;
@@ -116,6 +116,8 @@ export class AuthService {
         where: { id: payload.sub },
         include: { role: true },
       });
+
+      if (!user) throw new ForbiddenException('User not found');
 
       const tokens = await this.generateTokens(user.id, user.email, user.role.name);
 
@@ -185,12 +187,12 @@ export class AuthService {
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: this.config.get<string>('JWT_SECRET'),
-        expiresIn: this.config.get<string>('JWT_EXPIRES_IN') || '15m',
+        secret: this.config.get<string>('JWT_SECRET') || 'secret',
+        expiresIn: (this.config.get<string>('JWT_EXPIRES_IN') || '15m') as any,
       }),
       this.jwtService.signAsync(payload, {
-        secret: this.config.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.config.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d',
+        secret: this.config.get<string>('JWT_REFRESH_SECRET') || 'refresh-secret',
+        expiresIn: (this.config.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d') as any,
       }),
     ]);
 
